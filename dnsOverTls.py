@@ -1,7 +1,6 @@
 from App import dnsTLS
 import socket
 import threading
-from logger import logger
 
 
 class ThreadedServer(object):
@@ -13,18 +12,16 @@ class ThreadedServer(object):
         self.sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         self.sock.bind((self.host, self.port))
 
-    def resolve(self, url):
+    def resolve(self, url, host='1dot1dot1dot1.cloudflare-dns.com', port=853, ip=None):
         """Function resolves a url/domain to the Corresponding DNS Record
         Since We are using TCP DNS We PREPEND The length of the message (packet_length) REF - RFC7766 #section-8
         Establishes a TLS conn with cloudfare and returns the Response
         @params - url - the domain/url/hostname
         """
-        dnsTLdObj = dnsTLS()
-        tcp_packet = dnsTLdObj.buildPacket(url).encode("hex")
-        packet_length = dnsTLdObj.getLength(tcp_packet)
-        message = packet_length + tcp_packet
+        dnsTLdObj = dnsTLS(host, port, ip)
+        tcp_packet = dnsTLdObj.buildPacket(url)
         conn = dnsTLdObj.connect()
-        dns_response = dnsTLdObj.sendMessage(message, conn)
+        dns_response = dnsTLdObj.sendMessage(tcp_packet, conn)
 
         ip = dnsTLdObj.extractIp(dns_response)
         return ip
@@ -45,14 +42,13 @@ class ThreadedServer(object):
         while True:
             try:
                 data = client.recv(size)
-                logger.debug(data)
                 if data:
                     query = str(data).split(":")
                     if query[0] == 'domain':
                         # Set the response to echo back the recieved data
                         url = query[1]
                         dns_response = self.resolve(url)
-                        logger.info("{0} retrieved for DNS query on {1}".format(dns_response, url))
+                        print("{0} retrieved for DNS query on {1}".format(dns_response, url))
                         client.send(dns_response)
                 else:
                     raise error('Client disconnected')
